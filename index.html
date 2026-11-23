@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Laboratuvar Rezervasyonu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  /* Düzen: üstte haftalık gezinme, altında milimetrik kâğıt gibi saat ızgarası; telefonda gün gün liste. */
+  :root {
+    --hh: 44px;
+    --bg: #f3f6f5;
+    --surface: #ffffff;
+    --ink: #14201c;
+    --muted: #5a6964;
+    --line: #d6dfdb;
+    --grid: #e9efec;
+    --accent: #0d6a5f;
+    --accent-ink: #ffffff;
+    --accent-soft: #dcefea;
+    --today: rgba(13, 106, 95, .045);
+    --danger: #b42318;
+    --danger-soft: #fde8e6;
+    --now: #d9480f;
+    --bk-s: 62%;
+    --bk-l: 92%;
+    --bk-edge: 36%;
+    --bk-ink: #14201c;
+    --scrim: rgba(10, 22, 19, .45);
+    --shadow: 0 12px 36px rgba(14, 40, 34, .18);
+    --f-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --f-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1413;
+      --surface: #151d1b;
+      --ink: #e2ebe8;
+      --muted: #91a29c;
+      --line: #2a3633;
+      --grid: #1c2624;
+      --accent: #4cc0ae;
+      --accent-ink: #052520;
+      --accent-soft: #173431;
+      --today: rgba(76, 192, 174, .06);
+      --danger: #f97066;
+      --danger-soft: #3a1c1a;
+      --now: #ff8a4c;
+      --bk-s: 34%;
+      --bk-l: 23%;
+      --bk-edge: 66%;
+      --bk-ink: #e2ebe8;
+      --scrim: rgba(0, 0, 0, .6);
+      --shadow: 0 12px 36px rgba(0, 0, 0, .5);
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 14px/1.45 var(--f-sans); }
+  [hidden] { display: none !important; }
+  .t, .dnum, .hl, .sub { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+
+  button, select, input { font: inherit; color: inherit; }
+  button, select {
+    border: 1px solid var(--line); background: var(--surface); border-radius: 8px;
+    padding: 7px 12px; cursor: pointer;
+  }
+  button:hover, select:hover { background: var(--grid); }
+  button:focus-visible, select:focus-visible, input:focus-visible, .dcol:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+  button:disabled { opacity: .6; cursor: progress; }
+  .primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 500; }
+  .primary:hover { background: var(--accent); filter: brightness(1.08); }
+  .danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+  .danger:hover { background: var(--danger); filter: brightness(1.08); }
+
+  .top {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px;
+    padding-block: 14px; padding-left: max(16px, 2vw); padding-right: max(16px, 2vw);
+    background: var(--surface); border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .brand svg { flex: none; color: var(--accent); }
+  h1 { margin: 0; font-size: 17px; font-weight: 600; text-wrap: balance; }
+  .sub { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
+  .nav { display: flex; }
+  .nav button { border-radius: 0; margin-left: -1px; }
+  .nav button:first-child { border-radius: 8px 0 0 8px; margin-left: 0; }
+  .nav button:last-child { border-radius: 0 8px 8px 0; }
+  .nav .ok { width: 36px; padding-inline: 0; font-size: 16px; line-height: 1; }
+
+  .banner { padding: 8px max(16px, 2vw); font-size: 13px; background: var(--accent-soft); }
+  .banner.err { background: var(--danger-soft); color: var(--danger); }
+
+  main { padding: 16px max(16px, 2vw) 32px; }
+
+  /* Haftalık ızgara */
+  .week { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow-x: auto; }
+  .grid { min-width: calc(56px + 7 * 112px); }
+  .ghead, .gbody { display: grid; grid-template-columns: 56px repeat(7, minmax(112px, 1fr)); }
+  .ghead { border-bottom: 1px solid var(--line); }
+  .dhead { display: flex; align-items: baseline; gap: 6px; padding: 10px 10px 8px; border-left: 1px solid var(--line); }
+  .dname { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+  .dnum { font-size: 17px; font-weight: 500; }
+  .dhead.today .dnum { background: var(--accent); color: var(--accent-ink); border-radius: 6px; padding: 0 6px; }
+  .dhead.today .dname { color: var(--accent); }
+  .gutter { position: relative; height: calc(var(--saat) * var(--hh)); }
+  .hl { position: absolute; right: 8px; font-size: 11px; color: var(--muted); transform: translateY(3px); }
+  .dcol {
+    position: relative; height: calc(var(--saat) * var(--hh)); border-left: 1px solid var(--line); cursor: cell;
+    background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(var(--grid) 1px, transparent 1px);
+    background-size: 100% var(--hh), 100% calc(var(--hh) / 2);
+  }
+  .dcol.today { background-color: var(--today); }
+  .dcol:hover { background-color: var(--today); }
+  .bk {
+    position: absolute; display: flex; flex-direction: column; gap: 1px; overflow: hidden; text-align: left;
+    left: calc(var(--lane) / var(--n) * 100% + 3px); width: calc(100% / var(--n) - 6px);
+    padding: 3px 6px; border: 0; border-left: 3px solid hsl(var(--h) 55% var(--bk-edge)); border-radius: 6px;
+    background: hsl(var(--h) var(--bk-s) var(--bk-l)); color: var(--bk-ink); font-size: 12px; line-height: 1.3;
+  }
+  .bk:hover { background: hsl(var(--h) var(--bk-s) var(--bk-l)); filter: brightness(.97); }
+  .bk .t { font-size: 11px; opacity: .8; }
+  .bk .a { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bk .x { opacity: .75; overflow: hidden; text-overflow: ellipsis; }
+  .now { position: absolute; left: 0; right: 0; height: 2px; background: var(--now); pointer-events: none; z-index: 2; }
+  .now::before { content: ""; position: absolute; left: -5px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: var(--now); }
+  .ipucu { margin: 10px 2px 0; color: var(--muted); font-size: 12.5px; }
+
+  /* Telefon: gün gün liste */
+  .agenda { display: none; flex-direction: column; gap: 12px; }
+  .aday { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .aday.today { border-color: var(--accent); }
+  .ahead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .ahead h2 { margin: 0; font-size: 15px; font-weight: 600; }
+  .aday.today h2 { color: var(--accent); }
+  .mini { padding: 4px 10px; font-size: 13px; }
+  .bos { margin: 0; color: var(--muted); font-size: 13px; }
+  .aitem {
+    display: flex; gap: 12px; align-items: flex-start; text-align: left; width: 100%;
+    border: 0; border-left: 3px solid hsl(var(--h) 55% var(--bk-edge)); border-radius: 8px;
+    background: hsl(var(--h) var(--bk-s) var(--bk-l)); color: var(--bk-ink); padding: 8px 10px;
+  }
+  .aitem:hover { background: hsl(var(--h) var(--bk-s) var(--bk-l)); filter: brightness(.97); }
+  .aitem .t { font-size: 13px; white-space: nowrap; }
+  .am { display: flex; flex-direction: column; min-width: 0; }
+  .am .a { font-weight: 600; }
+  .am .x { font-size: 13px; opacity: .8; overflow-wrap: anywhere; }
+
+  @media (max-width: 720px) {
+    .week, .ipucu { display: none; }
+    .agenda { display: flex; }
+    .controls { margin-left: 0; width: 100%; }
+    .controls .primary { margin-left: auto; }
+  }
+
+  /* Pencereler */
+  .modal { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 16px; background: var(--scrim); }
+  .panel {
+    width: min(460px, 100%); max-height: calc(100vh - 32px); overflow: auto;
+    background: var(--surface); border-radius: 14px; box-shadow: var(--shadow); padding: 20px;
+  }
+  .panel h2 { margin: 0 0 16px; font-size: 18px; font-weight: 600; }
+  form { display: flex; flex-direction: column; gap: 14px; }
+  .alan { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+  .alan > span { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .alan input, .alan select {
+    width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg);
+  }
+  .sira { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 12px; }
+  @media (max-width: 420px) { .sira { grid-template-columns: 1fr 1fr; } .sira .alan:first-child { grid-column: 1 / -1; } }
+  .form-hata { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--danger-soft); color: var(--danger); font-size: 13px; }
+  .butonlar { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+  dl { margin: 0 0 18px; display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; }
+  dt { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; padding-top: 2px; }
+  dd { margin: 0; overflow-wrap: anywhere; }
+  .onay { flex: 1 1 100%; margin: 0; color: var(--danger); font-size: 13px; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 30;
+    background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; box-shadow: var(--shadow); font-size: 13.5px;
+    max-width: calc(100% - 32px);
+  }
+  .toast.err { background: var(--danger); color: #fff; }
+  .yukleniyor { padding: 40px; text-align: center; color: var(--muted); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .panel { animation: gir .16s ease-out; }
+    @keyframes gir { from { transform: translateY(8px); opacity: .4; } to { transform: none; opacity: 1; } }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg width="30" height="30" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <path d="M12 3h8M13 3v9L5.5 25.2A2.5 2.5 0 0 0 7.7 29h16.6a2.5 2.5 0 0 0 2.2-3.8L19 12V3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M9 21h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    <div>
+      <h1 id="labAdi">Laboratuvar Rezervasyonu</h1>
+      <p class="sub" id="haftaEtiket">&nbsp;</p>
+    </div>
+  </div>
+  <div class="controls">
+    <div class="nav">
+      <button type="button" class="ok" id="onceki" aria-label="Önceki hafta">‹</button>
+      <button type="button" id="buHafta">Bu hafta</button>
+      <button type="button" class="ok" id="sonraki" aria-label="Sonraki hafta">›</button>
+    </div>
+    <select id="cihazFiltre" aria-label="Cihaz filtresi" hidden></select>
+    <button type="button" class="primary" id="yeniBtn">+ Rezervasyon</button>
+  </div>
+</header>
+<div class="banner" id="onizleme" hidden>Önizleme modu: Google'a bağlı değil. Örnek kayıtlar gösteriliyor ve eklediğiniz kayıtlar saklanmıyor.</div>
+<div class="banner err" id="hata" hidden></div>
+
+<main>
+  <section class="week" aria-label="Haftalık takvim">
+    <div class="grid" id="grid"><div class="yukleniyor">Takvim yükleniyor…</div></div>
+  </section>
+  <p class="ipucu">Boş bir saate tıklayarak o saat için rezervasyon ekleyebilirsiniz. Bir kayda tıklayınca ayrıntısı açılır.</p>
+  <section class="agenda" id="ajanda" aria-label="Haftanın günleri"></section>
+</main>
+
+<div class="modal" id="formModal" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="formBaslik">
+    <h2 id="formBaslik">Yeni rezervasyon</h2>
+    <form id="form" novalidate>
+      <label class="alan"><span>Ad Soyad</span>
+        <input id="fAd" list="adlar" autocomplete="name" maxlength="60" required>
+      </label>
+      <datalist id="adlar"></datalist>
+      <label class="alan" id="fCihazAlan" hidden><span>Cihaz</span>
+        <select id="fCihaz"></select>
+      </label>
+      <div class="sira">
+        <label class="alan"><span>Tarih</span><input id="fTarih" type="date" required></label>
+        <label class="alan"><span>Başlangıç</span><input id="fBas" type="time" step="900" required></label>
+        <label class="alan"><span>Bitiş</span><input id="fBit" type="time" step="900" required></label>
+      </div>
+      <label class="alan"><span>Deney / not (isteğe bağlı)</span>
+        <input id="fNot" maxlength="200" placeholder="örn. Western blot, 2. tekrar">
+      </label>
+      <p class="form-hata" id="formHata" role="alert" hidden></p>
+      <div class="butonlar">
+        <button type="button" data-kapat>Vazgeç</button>
+        <button type="submit" class="primary" id="kaydet">Kaydet</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal" id="detayModal" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="dAd">
+    <h2 id="dAd"></h2>
+    <dl>
+      <dt>Zaman</dt><dd id="dZaman"></dd>
+      <dt id="dCihazEt">Cihaz</dt><dd id="dCihaz"></dd>
+      <dt>Not</dt><dd id="dNot"></dd>
+    </dl>
+    <div class="butonlar">
+      <p class="onay" id="silSoru" hidden>Bu rezervasyon silinsin mi? Bu işlem sayfadan geri alınamaz.</p>
+      <button type="button" data-kapat id="kapatBtn">Kapat</button>
+      <button type="button" id="silBtn">Sil</button>
+      <button type="button" class="danger" id="silEvet" hidden>Evet, sil</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(function () {
+  'use strict';
+  // Sayfa GitHub Pages gibi Google dışında bir yerde açıldığında kayıtlar bu adrese gönderilir.
+  // Apps Script'te "Dağıt → Dağıtımları yönet" altındaki Web uygulaması URL'si (sonu /exec).
+  var API_URL = 'https://script.google.com/macros/s/AKfycbzHexcNW38JwiJ2RrRnY2VK66PKch5GjcWkUNVLq-zM1LnZcHwll0PAlgsNXCUqkLSWvg/exec';
+
+  var GAS = !!(window.google && google.script && google.script.run);
+  var ONIZLEME = !GAS && (!API_URL || /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && /onizleme/.test(location.search));
+  var $ = function (id) { return document.getElementById(id); };
+
+  var ayar = null, adlar = [], kayitlar = [], filtre = '', seciliId = null, sonOdak = null;
+  var haftaBas = pazartesi(new Date());
+
+  // ---------- tarih / saat yardımcıları ----------
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function ymd(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function ymdOku(s) { var p = s.split('-').map(Number); return new Date(p[0], p[1] - 1, p[2]); }
+  function gunEkle(d, n) { var x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() + n); return x; }
+  function pazartesi(d) { var x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); return gunEkle(x, -((x.getDay() + 6) % 7)); }
+  function dk(t) { var p = t.split(':').map(Number); return p[0] * 60 + p[1]; }
+  function saat(m) { return pad(Math.floor(m / 60)) + ':' + pad(m % 60); }
+  function ayAdi(d) { return d.toLocaleDateString('tr-TR', { month: 'long' }); }
+  function uzunTarih(s) { return ymdOku(s).toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); }
+  function haftaEtiketi() {
+    var s = haftaBas, e = gunEkle(s, 6);
+    if (s.getMonth() === e.getMonth()) return s.getDate() + ' – ' + e.getDate() + ' ' + ayAdi(e) + ' ' + e.getFullYear();
+    if (s.getFullYear() === e.getFullYear()) return s.getDate() + ' ' + ayAdi(s) + ' – ' + e.getDate() + ' ' + ayAdi(e) + ' ' + e.getFullYear();
+    return s.getDate() + ' ' + ayAdi(s) + ' ' + s.getFullYear() + ' – ' + e.getDate() + ' ' + ayAdi(e) + ' ' + e.getFullYear();
+  }
+  function renkTonu(ad) {
+    var h = 0, s = String(ad).toLocaleLowerCase('tr');
+    for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
+    return h;
+  }
+  function el(tag, cls, metin) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (metin != null) e.textContent = metin;
+    return e;
+  }
+  function hafiza(k) { try { return localStorage.getItem('labtakvim.' + k) || ''; } catch (e) { return ''; } }
+  function hafizaYaz(k, v) { try { localStorage.setItem('labtakvim.' + k, v); } catch (e) {} }
+  function mesaj(err) { return String((err && err.message) || err || 'Bilinmeyen hata').replace(/^(Error|Exception|Hata):\s*/i, ''); }
+
+  // ---------- sunucu çağrısı (Apps Script ya da önizleme) ----------
+  function api(fn) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return new Promise(function (res, rej) {
+      if (GAS) {
+        var r = google.script.run.withSuccessHandler(res).withFailureHandler(rej);
+        r[fn].apply(r, args);
+      } else if (!ONIZLEME) {
+        // text/plain gövde, tarayıcının ek CORS ön isteği göndermesini önler; çerez gönderilmez,
+        // bu yüzden telefondaki Google oturumu sonucu etkilemez.
+        fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ fn: fn, args: args })
+        }).then(function (yanit) {
+          if (!yanit.ok) throw new Error('Sunucu yanıt vermedi (' + yanit.status + ')');
+          return yanit.text();
+        }).then(function (metin) {
+          var j;
+          try { j = JSON.parse(metin); } catch (e) {
+            throw new Error('Sunucudan beklenmeyen yanıt geldi. Code.gs güncellenip "Yeni sürüm" olarak dağıtıldı mı?');
+          }
+          if (j.ok) res(j.veri); else rej(new Error(j.hata));
+        }).catch(function (e) {
+          rej(e && e.name === 'TypeError' ? new Error('Sunucuya ulaşılamadı. İnternet bağlantısını kontrol edin; sorun sürerse Code.gs\'in yeni sürümü henüz dağıtılmamış olabilir') : e);
+        });
+      } else {
+        setTimeout(function () { try { res(Onizleme[fn].apply(null, args)); } catch (e) { rej(e); } }, 120);
+      }
+    });
+  }
+
+  // ---------- çizim ----------
+  function gorunenler() { return kayitlar.filter(function (k) { return !filtre || k.cihaz === filtre; }); }
+  function cokCihaz() { return ayar.cihazlar.length > 1; }
+  function altSatir(k) { return [cokCihaz() && !filtre ? k.cihaz : '', k.not].filter(Boolean).join(' · '); }
+
+  function yerlestir(liste) {
+    liste.sort(function (a, b) { return a.s - b.s || a.e - b.e; });
+    var grup = [], grupSon = -1;
+    function bosalt() {
+      var sonlar = [];
+      grup.forEach(function (b) {
+        var i = sonlar.findIndex(function (e) { return e <= b.s; });
+        if (i < 0) { i = sonlar.length; sonlar.push(b.e); } else sonlar[i] = b.e;
+        b.lane = i;
+      });
+      grup.forEach(function (b) { b.n = sonlar.length; });
+      grup = [];
+    }
+    liste.forEach(function (b) {
+      if (grup.length && b.s >= grupSon) bosalt();
+      grup.push(b); grupSon = Math.max(grupSon, b.e);
+    });
+    if (grup.length) bosalt();
+  }
+
+  function cizIzgara() {
+    var g = $('grid');
+    g.replaceChildren();
+    var bas = dk(ayar.gunBaslangic), bit = dk(ayar.gunBitis), saatSay = Math.max(1, Math.ceil((bit - bas) / 60));
+    bit = bas + saatSay * 60;
+    g.style.setProperty('--saat', saatSay);
+    var bugun = ymd(new Date());
+    var bas1 = el('div', 'ghead'); bas1.append(el('div'));
+    var govde = el('div', 'gbody');
+    var oluk = el('div', 'gutter');
+    for (var i = 0; i < saatSay; i++) { var l = el('span', 'hl', saat(bas + i * 60)); l.style.top = (i * 44) + 'px'; oluk.append(l); }
+    govde.append(oluk);
+
+    for (var g7 = 0; g7 < 7; g7++) (function (d) {
+      var t = ymd(d), bugunMu = t === bugun;
+      var h = el('div', 'dhead' + (bugunMu ? ' today' : ''));
+      h.append(el('span', 'dname', d.toLocaleDateString('tr-TR', { weekday: 'short' })), el('span', 'dnum', String(d.getDate())));
+      bas1.append(h);
+
+      var kol = el('div', 'dcol' + (bugunMu ? ' today' : ''));
+      kol.addEventListener('click', function (e) {
+        if (e.target !== kol) return;
+        var y = e.clientY - kol.getBoundingClientRect().top;
+        var m = bas + Math.floor(y / 44 * 2) * 30;
+        m = Math.min(Math.max(m, bas), bit - 30);
+        formAc({ tarih: t, baslangic: saat(m), bitis: saat(Math.min(m + 60, bit)) });
+      });
+
+      var gun = gorunenler().filter(function (k) { return k.tarih === t; })
+        .map(function (k) { return { k: k, s: dk(k.baslangic), e: dk(k.bitis) }; });
+      yerlestir(gun);
+      gun.forEach(function (b) {
+        var s = b.s, e = b.e;
+        if (e <= bas) { s = bas; e = bas + 25; } else if (s >= bit) { s = bit - 25; e = bit; }
+        s = Math.max(s, bas); e = Math.min(e, bit);
+        var btn = el('button', 'bk'); btn.type = 'button';
+        btn.style.top = ((s - bas) / 60 * 44 + 1) + 'px';
+        btn.style.height = Math.max((e - s) / 60 * 44 - 2, 20) + 'px';
+        btn.style.setProperty('--h', renkTonu(b.k.ad));
+        btn.style.setProperty('--lane', b.lane);
+        btn.style.setProperty('--n', b.n);
+        btn.append(el('span', 't', b.k.baslangic + '–' + b.k.bitis), el('span', 'a', b.k.ad));
+        var alt = altSatir(b.k); if (alt) btn.append(el('span', 'x', alt));
+        btn.setAttribute('aria-label', b.k.ad + ', ' + b.k.baslangic + '–' + b.k.bitis + (alt ? ', ' + alt : ''));
+        btn.addEventListener('click', function () { detayAc(b.k.id); });
+        kol.append(btn);
+      });
+
+      if (bugunMu) {
+        var n = new Date(), m = n.getHours() * 60 + n.getMinutes();
+        if (m >= bas && m <= bit) { var cizgi = el('div', 'now'); cizgi.style.top = ((m - bas) / 60 * 44) + 'px'; kol.append(cizgi); }
+      }
+      govde.append(kol);
+    })(gunEkle(haftaBas, g7));
+
+    g.append(bas1, govde);
+  }
+
+  function cizAjanda() {
+    var a = $('ajanda'); a.replaceChildren();
+    var bugun = ymd(new Date());
+    for (var i = 0; i < 7; i++) (function (d) {
+      var t = ymd(d);
+      var kart = el('section', 'aday' + (t === bugun ? ' today' : ''));
+      var ust = el('div', 'ahead');
+      ust.append(el('h2', null, d.toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' })));
+      var ekle = el('button', 'mini', '+ Ekle'); ekle.type = 'button';
+      ekle.setAttribute('aria-label', d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' }) + ' için rezervasyon ekle');
+      ekle.addEventListener('click', function () { formAc({ tarih: t }); });
+      ust.append(ekle); kart.append(ust);
+      var liste = gorunenler().filter(function (k) { return k.tarih === t; })
+        .sort(function (x, y) { return x.baslangic.localeCompare(y.baslangic); });
+      if (!liste.length) kart.append(el('p', 'bos', 'Rezervasyon yok'));
+      liste.forEach(function (k) {
+        var b = el('button', 'aitem'); b.type = 'button';
+        b.style.setProperty('--h', renkTonu(k.ad));
+        b.append(el('span', 't', k.baslangic + '–' + k.bitis));
+        var m = el('span', 'am'); m.append(el('span', 'a', k.ad));
+        var alt = altSatir(k); if (alt) m.append(el('span', 'x', alt));
+        b.append(m);
+        b.addEventListener('click', function () { detayAc(k.id); });
+        kart.append(b);
+      });
+      a.append(kart);
+    })(gunEkle(haftaBas, i));
+  }
+
+  function ciz() {
+    $('haftaEtiket').textContent = haftaEtiketi();
+    cizIzgara();
+    cizAjanda();
+  }
+
+  // ---------- veri ----------
+  var istekNo = 0;
+  function yukle() {
+    var no = ++istekNo;
+    return api('getBookings', ymd(haftaBas), ymd(gunEkle(haftaBas, 6))).then(function (liste) {
+      if (no !== istekNo) return;
+      kayitlar = liste; $('hata').hidden = true; ciz();
+    }).catch(function (e) {
+      $('hata').textContent = 'Rezervasyonlar yüklenemedi (' + mesaj(e) + '). Sayfayı yenileyin.';
+      $('hata').hidden = false;
+    });
+  }
+  function adlariGuncelle() {
+    var dl = $('adlar'); dl.replaceChildren();
+    adlar.forEach(function (a) { var o = el('option'); o.value = a; dl.append(o); });
+  }
+
+  // ---------- pencereler ----------
+  function modalAc(id) { sonOdak = document.activeElement; $(id).hidden = false; }
+  function modalKapat(id) { $(id).hidden = true; if (sonOdak && sonOdak.focus) sonOdak.focus(); }
+  function acikModal() { return ['formModal', 'detayModal'].filter(function (id) { return !$(id).hidden; })[0]; }
+  document.querySelectorAll('.modal').forEach(function (m) {
+    m.addEventListener('click', function (e) { if (e.target === m || e.target.hasAttribute('data-kapat')) modalKapat(m.id); });
+  });
+  document.addEventListener('keydown', function (e) { var m = acikModal(); if (e.key === 'Escape' && m) modalKapat(m); });
+
+  var toastZaman;
+  function toast(metin, hataMi) {
+    var t = $('toast'); t.textContent = metin; t.className = 'toast' + (hataMi ? ' err' : ''); t.hidden = false;
+    clearTimeout(toastZaman); toastZaman = setTimeout(function () { t.hidden = true; }, 3200);
+  }
+
+  function formHata(metin) { var h = $('formHata'); h.textContent = metin; h.hidden = false; }
+  function formAc(on) {
+    on = on || {};
+    $('form').reset(); $('formHata').hidden = true;
+    $('fAd').value = hafiza('ad');
+    $('fTarih').value = on.tarih || ymd(new Date());
+    $('fBas').value = on.baslangic || '09:00';
+    $('fBit').value = on.bitis || '10:00';
+    if (cokCihaz()) {
+      var c = filtre || hafiza('cihaz');
+      $('fCihaz').value = ayar.cihazlar.indexOf(c) >= 0 ? c : ayar.cihazlar[0];
+    }
+    modalAc('formModal');
+    ($('fAd').value ? $('fNot') : $('fAd')).focus();
+  }
+
+  $('form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var k = {
+      ad: $('fAd').value.trim(),
+      cihaz: cokCihaz() ? $('fCihaz').value : ayar.cihazlar[0],
+      tarih: $('fTarih').value,
+      baslangic: $('fBas').value.slice(0, 5),
+      bitis: $('fBit').value.slice(0, 5),
+      not: $('fNot').value.trim()
+    };
+    if (!k.ad) return formHata('Adınızı yazın.');
+    if (!k.tarih || !k.baslangic || !k.bitis) return formHata('Tarih, başlangıç ve bitiş saatini doldurun.');
+    if (k.bitis <= k.baslangic) return formHata('Bitiş saati başlangıçtan sonra olmalı.');
+    var btn = $('kaydet'); btn.disabled = true; btn.textContent = 'Kaydediliyor…';
+    api('addBooking', k).then(function () {
+      hafizaYaz('ad', k.ad); hafizaYaz('cihaz', k.cihaz);
+      if (adlar.indexOf(k.ad) < 0) { adlar.push(k.ad); adlariGuncelle(); }
+      modalKapat('formModal');
+      haftaBas = pazartesi(ymdOku(k.tarih));
+      toast('Rezervasyon eklendi: ' + uzunTarih(k.tarih) + ', ' + k.baslangic + '–' + k.bitis);
+      return yukle();
+    }).catch(function (err) { formHata(mesaj(err)); })
+      .then(function () { btn.disabled = false; btn.textContent = 'Kaydet'; });
+  });
+
+  function detayAc(id) {
+    var k = kayitlar.find(function (x) { return x.id === id; });
+    if (!k) return;
+    seciliId = id;
+    $('dAd').textContent = k.ad;
+    $('dZaman').textContent = uzunTarih(k.tarih) + ', ' + k.baslangic + '–' + k.bitis;
+    $('dCihaz').textContent = k.cihaz;
+    $('dCihaz').hidden = $('dCihazEt').hidden = !cokCihaz();
+    $('dNot').textContent = k.not || '—';
+    $('silSoru').hidden = true; $('silEvet').hidden = true; $('silBtn').hidden = false;
+    $('kapatBtn').textContent = 'Kapat';
+    modalAc('detayModal');
+    $('kapatBtn').focus();
+  }
+  $('silBtn').addEventListener('click', function () {
+    $('silBtn').hidden = true; $('silSoru').hidden = false; $('silEvet').hidden = false;
+    $('kapatBtn').textContent = 'Vazgeç';
+    $('silEvet').focus();
+  });
+  $('silEvet').addEventListener('click', function () {
+    var b = $('silEvet'); b.disabled = true; b.textContent = 'Siliniyor…';
+    api('deleteBooking', seciliId).then(function (silindi) {
+      modalKapat('detayModal');
+      toast(silindi ? 'Rezervasyon silindi' : 'Bu rezervasyon zaten silinmiş');
+      return yukle();
+    }).catch(function (err) { toast('Silinemedi: ' + mesaj(err), true); })
+      .then(function () { b.disabled = false; b.textContent = 'Evet, sil'; });
+  });
+
+  // ---------- gezinme ----------
+  $('onceki').addEventListener('click', function () { haftaBas = gunEkle(haftaBas, -7); ciz(); yukle(); });
+  $('sonraki').addEventListener('click', function () { haftaBas = gunEkle(haftaBas, 7); ciz(); yukle(); });
+  $('buHafta').addEventListener('click', function () { haftaBas = pazartesi(new Date()); ciz(); yukle(); });
+  $('yeniBtn').addEventListener('click', function () {
+    var bugun = new Date(), son = gunEkle(haftaBas, 6);
+    formAc({ tarih: bugun >= haftaBas && bugun <= gunEkle(son, 1) ? ymd(bugun) : ymd(haftaBas) });
+  });
+  $('cihazFiltre').addEventListener('change', function () { filtre = this.value; hafizaYaz('filtre', filtre); ciz(); });
+
+  // Başkalarının eklediği kayıtları görmek için dakikada bir yenile.
+  setInterval(function () { if (!document.hidden && !acikModal()) yukle(); }, 60000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && ayar && !acikModal()) yukle(); });
+
+  // ---------- açılış ----------
+  function basla(veri) {
+    ayar = veri.ayarlar; adlar = veri.adlar || []; kayitlar = veri.kayitlar || [];
+    $('labAdi').textContent = ayar.labAdi; document.title = ayar.labAdi;
+    adlariGuncelle();
+    if (cokCihaz()) {
+      var f = $('cihazFiltre'), fc = $('fCihaz');
+      var tum = el('option', null, 'Tüm cihazlar'); tum.value = ''; f.append(tum);
+      ayar.cihazlar.forEach(function (c) {
+        var o = el('option', null, c); o.value = c; f.append(o);
+        var o2 = el('option', null, c); o2.value = c; fc.append(o2);
+      });
+      var kayitli = hafiza('filtre');
+      if (ayar.cihazlar.indexOf(kayitli) >= 0) { filtre = kayitli; f.value = kayitli; }
+      f.hidden = false; $('fCihazAlan').hidden = false;
+    }
+    ciz();
+  }
+
+  if (ONIZLEME) $('onizleme').hidden = false;
+  api('getInitial', ymd(haftaBas), ymd(gunEkle(haftaBas, 6))).then(basla).catch(function (e) {
+    $('grid').replaceChildren(el('div', 'yukleniyor', 'Takvim açılamadı: ' + mesaj(e)));
+  });
+
+  // ---------- önizleme (yalnızca Google dışında, örneğin dosyayı doğrudan açınca) ----------
+  var Onizleme = (function () {
+    var ayarlar = { labAdi: 'Laboratuvar Rezervasyonu', cihazlar: ['HPLC', 'Spektrofotometre'], gunBaslangic: '08:00', gunBitis: '20:00' };
+    var p = pazartesi(new Date());
+    var satirlar = [
+      [0, '09:00', '11:30', 'Örnek: Ayşe', 'HPLC', 'Kalibrasyon'],
+      [0, '10:00', '12:00', 'Örnek: Mehmet', 'Spektrofotometre', 'Absorbans ölçümü'],
+      [1, '13:00', '16:00', 'Örnek: Zeynep', 'HPLC', 'Numune seti B'],
+      [2, '08:30', '10:00', 'Örnek: Ayşe', 'Spektrofotometre', ''],
+      [3, '14:00', '18:00', 'Örnek: Can', 'HPLC', 'Uzun koşu'],
+      [4, '09:00', '12:00', 'Örnek: Mehmet', 'HPLC', 'Tekrar ölçüm']
+    ];
+    var kayit = satirlar.map(function (r, i) {
+      return { id: 'o' + i, tarih: ymd(gunEkle(p, r[0])), baslangic: r[1], bitis: r[2], ad: r[3], cihaz: r[4], not: r[5] };
+    });
+    function aralik(b, e) { return kayit.filter(function (k) { return k.tarih >= b && k.tarih <= e; }); }
+    return {
+      getInitial: function (b, e) {
+        var a = []; kayit.forEach(function (k) { if (a.indexOf(k.ad) < 0) a.push(k.ad); });
+        return { ayarlar: ayarlar, adlar: a, kayitlar: aralik(b, e) };
+      },
+      getBookings: aralik,
+      addBooking: function (k) {
+        var c = kayit.find(function (x) { return x.cihaz === k.cihaz && x.tarih === k.tarih && k.baslangic < x.bitis && k.bitis > x.baslangic; });
+        if (c) throw new Error('Bu saat dolu: ' + c.ad + ', ' + c.cihaz + ' için ' + c.baslangic + '–' + c.bitis + ' arasını ayırmış.');
+        var y = Object.assign({ id: 'y' + Date.now() }, k); kayit.push(y); return y.id;
+      },
+      deleteBooking: function (id) {
+        var i = kayit.findIndex(function (x) { return x.id === id; });
+        if (i < 0) return false; kayit.splice(i, 1); return true;
+      }
+    };
+  })();
+})();
+</script>
+</body>
+</html>
